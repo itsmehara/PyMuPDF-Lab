@@ -137,3 +137,89 @@ In such cases:
 * ⚠️ Special symbols may require extra font decoding or OCR.
 
 Would you like help with a full version that includes OpenCV detection for auto-detecting the circle positions from the rendered PDF page?
+
+Yes, absolutely — it's **okay** if the shapes are **rounded rectangles** instead of perfect ovals or circles. The good news is:
+
+### ✅ Rounded Rectangles = Just Rectangles for Extraction Purposes
+
+From PyMuPDF's perspective (and for most practical use cases), **a rounded rectangle behaves like a regular rectangle** when it comes to content positioning and bounding boxes.
+
+---
+
+## 🔄 What Changes?
+
+* **Ellipse check (`is_point_inside_ellipse`)** can be **replaced with a simple rectangle containment check**.
+* You just need to check whether the center of each text span is **within a rectangular bounding box**.
+
+---
+
+## 🔁 Updated Code for Rectangular or Rounded Rectangular Regions
+
+Here’s an updated version of the earlier code tailored to **rectangles (including rounded ones):**
+
+```python
+import fitz  # PyMuPDF
+
+def is_point_inside_rect(x, y, rect):
+    """Check if a point is inside a rectangular area."""
+    x0, y0, x1, y1 = rect
+    return x0 <= x <= x1 and y0 <= y <= y1
+
+def extract_text_in_rects(pdf_path, rect_bboxes):
+    doc = fitz.open(pdf_path)
+    results = []
+
+    for page in doc:
+        page_results = []
+        text_blocks = page.get_text("dict")["blocks"]
+        
+        for rect in rect_bboxes:
+            collected_text = ""
+            for block in text_blocks:
+                if block["type"] == 0:  # Text block
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            # Midpoint of text span box
+                            mid_x = (span["bbox"][0] + span["bbox"][2]) / 2
+                            mid_y = (span["bbox"][1] + span["bbox"][3]) / 2
+                            if is_point_inside_rect(mid_x, mid_y, rect):
+                                collected_text += span["text"] + " "
+            if collected_text:
+                page_results.append(collected_text.strip())
+        results.append(page_results)
+    
+    return results
+
+# Example usage
+pdf_file = "your_file.pdf"
+# Define some example rounded/regular rectangle bounding boxes
+rounded_rects = [
+    (100, 150, 200, 250),
+    (300, 400, 400, 500),
+]
+
+text_inside_rects = extract_text_in_rects(pdf_file, rounded_rects)
+
+for i, texts in enumerate(text_inside_rects):
+    print(f"Page {i + 1}:")
+    for content in texts:
+        print(f" - {content}")
+```
+
+---
+
+## 🧠 Pro Tip:
+
+If you can't predefine the coordinates of those rounded rectangles:
+
+* Use **`page.get_drawings()`** to try to identify them.
+* Or render the page to an image and use **OpenCV's contour or rectangle detection**.
+
+---
+
+So yes—**rounded rectangles are totally fine** and possibly even easier to handle than ellipses.
+
+Would you like to explore automatic shape detection with OpenCV from a rendered PDF page image?
+
+
+
